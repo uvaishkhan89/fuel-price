@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { FuelPriceModule } from './fuel-price/fuel-price.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { StateModule } from './state/state.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     }),
     FuelPriceModule,
     ScheduleModule.forRoot(),
+    StateModule,
   ],
   controllers: [],
   providers: [],

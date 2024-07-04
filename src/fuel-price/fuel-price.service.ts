@@ -1,18 +1,20 @@
-import { HttpService } from '@nestjs/axios';
 import axios from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import puppeteer from 'puppeteer';
 import { FuelPrice } from './entities/fuel-price.entity';
-
+import { InjectModel } from '@nestjs/sequelize';
+import { State } from '../state/entities/state.entity';
 @Injectable()
 export class FuelPriceService {
-
   private readonly logger = new Logger(FuelPriceService.name);
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    @InjectModel(FuelPrice) private readonly fuelPrice: typeof FuelPrice,
+    @InjectModel(State) private readonly state: typeof State
+  ) {}
 
-  async getReverseGeocoding(lat: number, lon: number) {
+  async getState(lat: number, lon: number) {
     const apiKey = process.env.GEOAPIFY_API_KEY;
     const apiUrl = `https://us1.locationiq.com/v1/reverse?key=${apiKey}&lat=${lat}&lon=${lon}&format=json&`;
     
@@ -23,10 +25,17 @@ export class FuelPriceService {
       throw new Error('Error fetching geocoding data');
     }
   }
+
+  @Cron(CronExpression.EVERY_DAY_AT_1PM)
+  async createFuelPriceForAllState() {
+    const states = await this.state.findAll();
+    for (const state of states) {
+      await this.createFuelPrice(state.name)
+    }
+  }
   
-  
-  async createFuelPrice(stateName: string = 'uttar pradesh') {
-    const state = stateName.replace(/\s+/g, '-');
+  async createFuelPrice(stateName: string) {
+    const state = stateName.trim().replace(/\s+/g, '-');
     const petrolPrice = await this.getFuelPrices('petrol', state);
     const dieselPrice = await this.getFuelPrices('diesel', state);
     const data = {
@@ -34,7 +43,7 @@ export class FuelPriceService {
       petrolPrice: petrolPrice.fuelPrice,
       dieselPrice: dieselPrice.fuelPrice
     }
-    return FuelPrice.create(data);
+    return this.fuelPrice.create(data);
   }
 
   async getFuelPrices(fuelName: string, state: string): Promise<any> {
@@ -54,10 +63,5 @@ export class FuelPriceService {
 
     await browser.close();
     return fuelPrices;
-  }
-
-  @Cron(CronExpression.EVERY_DAY_AT_NOON)
-  async hello() {
-    console.log('Hello Uvaish khan');
   }
 }
